@@ -1,4 +1,3 @@
-import httpx
 from aiogram import Bot
 from aiogram.enums import ParseMode
 
@@ -41,23 +40,17 @@ TELEGRAM_CAPTION_LIMIT = 1024
 
 async def _send_with_photo(text: str, photo_url: str):
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(photo_url)
-            resp.raise_for_status()
-            photo_bytes = resp.content
-
         if len(text) <= TELEGRAM_CAPTION_LIMIT:
             await bot.send_photo(
                 chat_id=TELEGRAM_CHANNEL_ID,
-                photo=photo_bytes,
+                photo=photo_url,
                 caption=text,
                 parse_mode=ParseMode.HTML,
             )
         else:
-            # Текст длиннее 1024 символов — шлём фото отдельно, потом текст
             await bot.send_photo(
                 chat_id=TELEGRAM_CHANNEL_ID,
-                photo=photo_bytes,
+                photo=photo_url,
             )
             await _send_text_only(text)
 
