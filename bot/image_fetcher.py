@@ -33,15 +33,19 @@ KEYWORD_TRANSLATIONS = {
 FALLBACK_QUERIES = ["breaking news", "world news", "newspaper", "city skyline", "global"]
 
 
-async def fetch_photo(title: str, category: str) -> Optional[str]:
+PICSUM_URL = "https://picsum.photos/1280/720"
+
+
+async def fetch_photo(title: str, category: str) -> str:
     query = _build_query(title, category)
 
-    for attempt_query in [query, "world news", "newspaper"]:
+    for attempt_query in [query, "world news", "newspaper", "city"]:
         url = await _request_unsplash(attempt_query)
         if url:
             return url
 
-    return None
+    # Гарантированный фолбэк — всегда возвращает случайное HD фото
+    return PICSUM_URL
 
 
 def _build_query(title: str, category: str) -> str:

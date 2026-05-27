@@ -22,11 +22,7 @@ async def post_one_news() -> bool:
             text = await format_news(item)
 
             photo_url = item.image_url or await fetch_photo(item.title, item.category)
-
-            if photo_url:
-                await _send_with_photo(text, photo_url)
-            else:
-                await _send_text_only(text)
+            await _send_with_photo(text, photo_url)
 
             await mark_posted(item.url, item.title)
             print(f"[poster] Posted: {item.title[:60]}...")
