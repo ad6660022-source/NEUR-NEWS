@@ -2,12 +2,13 @@ from aiogram import Bot
 from aiogram.enums import ParseMode
 
 from .config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
-from .news_fetcher import NewsItem, fetch_all_news
+from .news_fetcher import fetch_all_news
 from .ai_formatter import format_news
-from .image_fetcher import fetch_photo
 from .database import is_posted, mark_posted
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
+
+FOOTER = '\n\n<a href="https://t.me/neur_vpn_bot">🆓 БЕСПЛАТНЫЙ VPN</a>'
 
 
 async def post_one_news() -> bool:
@@ -20,8 +21,12 @@ async def post_one_news() -> bool:
         try:
             text = await format_news(item)
 
-            photo_url = item.image_url or await fetch_photo(item.title, item.category)
-            await _send_with_photo(text, photo_url)
+            await bot.send_message(
+                chat_id=TELEGRAM_CHANNEL_ID,
+                text=text + FOOTER,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
 
             await mark_posted(item.url, item.title)
             print(f"[poster] Posted: {item.title[:60]}...")
@@ -33,15 +38,3 @@ async def post_one_news() -> bool:
 
     print("[poster] No new news to post.")
     return False
-
-
-
-async def _send_with_photo(text: str, photo_url: str):
-    # Невидимая ссылка в конце — Telegram показывает превью фото под текстом
-    message = f'{text}\n<a href="{photo_url}">&#8203;</a>'
-    await bot.send_message(
-        chat_id=TELEGRAM_CHANNEL_ID,
-        text=message,
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=False,
-    )

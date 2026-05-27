@@ -48,8 +48,7 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
                     title = entry.get("title", "").strip()
                     summary = _extract_summary(entry)
 
-                    # Сначала пробуем получить фото из RSS, затем парсим og:image со страницы
-                    image_url = _extract_image(entry) or await _fetch_og_image(client, url)
+                    image_url = None
 
                     published = None
                     if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -78,20 +77,6 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
     return items
 
 
-async def _fetch_og_image(client: httpx.AsyncClient, url: str) -> Optional[str]:
-    try:
-        resp = await client.get(url, timeout=8.0)
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        for prop in ("og:image", "twitter:image", "og:image:url"):
-            tag = soup.find("meta", property=prop) or soup.find("meta", attrs={"name": prop})
-            if tag:
-                img = tag.get("content", "").strip()
-                if img and img.startswith("http"):
-                    return img
-    except Exception:
-        pass
-    return None
 
 
 def _extract_summary(entry) -> str:
