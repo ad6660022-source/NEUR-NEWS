@@ -38,22 +38,22 @@ async def post_one_news() -> bool:
 TELEGRAM_CAPTION_LIMIT = 1024
 
 
+def _truncate(text: str, limit: int = TELEGRAM_CAPTION_LIMIT) -> str:
+    if len(text) <= limit:
+        return text
+    truncated = text[:limit - 1]
+    last_dot = truncated.rfind(".")
+    return truncated[:last_dot + 1] if last_dot > limit // 2 else truncated
+
+
 async def _send_with_photo(text: str, photo_url: str):
     try:
-        if len(text) <= TELEGRAM_CAPTION_LIMIT:
-            await bot.send_photo(
-                chat_id=TELEGRAM_CHANNEL_ID,
-                photo=photo_url,
-                caption=text,
-                parse_mode=ParseMode.HTML,
-            )
-        else:
-            await bot.send_photo(
-                chat_id=TELEGRAM_CHANNEL_ID,
-                photo=photo_url,
-            )
-            await _send_text_only(text)
-
+        await bot.send_photo(
+            chat_id=TELEGRAM_CHANNEL_ID,
+            photo=photo_url,
+            caption=_truncate(text),
+            parse_mode=ParseMode.HTML,
+        )
     except Exception as e:
         print(f"[poster] Photo send failed ({e}), falling back to text only")
         await _send_text_only(text)
