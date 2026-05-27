@@ -35,34 +35,13 @@ async def post_one_news() -> bool:
     return False
 
 
-TELEGRAM_CAPTION_LIMIT = 1024
-
-
-def _truncate(text: str, limit: int = TELEGRAM_CAPTION_LIMIT) -> str:
-    if len(text) <= limit:
-        return text
-    truncated = text[:limit - 1]
-    last_dot = truncated.rfind(".")
-    return truncated[:last_dot + 1] if last_dot > limit // 2 else truncated
-
 
 async def _send_with_photo(text: str, photo_url: str):
-    try:
-        await bot.send_photo(
-            chat_id=TELEGRAM_CHANNEL_ID,
-            photo=photo_url,
-            caption=_truncate(text),
-            parse_mode=ParseMode.HTML,
-        )
-    except Exception as e:
-        print(f"[poster] Photo send failed ({e}), falling back to text only")
-        await _send_text_only(text)
-
-
-async def _send_text_only(text: str):
+    # Невидимая ссылка в конце — Telegram показывает превью фото под текстом
+    message = f'{text}\n<a href="{photo_url}">&#8203;</a>'
     await bot.send_message(
         chat_id=TELEGRAM_CHANNEL_ID,
-        text=text,
+        text=message,
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=False,
     )
