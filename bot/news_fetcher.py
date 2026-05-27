@@ -1,5 +1,6 @@
 import feedparser
 import httpx
+from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
@@ -22,7 +23,11 @@ class NewsItem:
 async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
     items: list[NewsItem] = []
 
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(
+        timeout=15.0,
+        follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; NEURNewsBot/1.0)"},
+    ) as client:
         for feed_cfg in RSS_FEEDS:
             try:
                 resp = await client.get(feed_cfg["url"])
@@ -42,7 +47,9 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
 
                     title = entry.get("title", "").strip()
                     summary = _extract_summary(entry)
-                    image_url = _extract_image(entry)
+
+                    # Сначала пробуем получить фото из RSS, затем парсим og:image со страницы
+                    image_url = _extract_image(entry) or await _fetch_og_image(client, url)
 
                     published = None
                     if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -71,6 +78,22 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
     return items
 
 
+async def _fetch_og_image(client: httpx.AsyncClient, url: str) -> Optional[str]:
+    try:
+        resp = await client.get(url, timeout=8.0)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        for prop in ("og:image", "twitter:image", "og:image:url"):
+            tag = soup.find("meta", property=prop) or soup.find("meta", attrs={"name": prop})
+            if tag:
+                img = tag.get("content", "").strip()
+                if img and img.startswith("http"):
+                    return img
+    except Exception:
+        pass
+    return None
+
+
 def _extract_summary(entry) -> str:
     for field in ("summary", "description", "content"):
         text = ""
@@ -81,7 +104,6 @@ def _extract_summary(entry) -> str:
             text = val
 
         if text:
-            from bs4 import BeautifulSoup
             clean = BeautifulSoup(text, "html.parser").get_text(separator=" ").strip()
             if len(clean) > 30:
                 return clean[:1500]
