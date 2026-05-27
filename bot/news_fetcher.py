@@ -82,7 +82,7 @@ def _extract_summary(entry) -> str:
 
         if text:
             from bs4 import BeautifulSoup
-            clean = BeautifulSoup(text, "lxml").get_text(separator=" ").strip()
+            clean = BeautifulSoup(text, "html.parser").get_text(separator=" ").strip()
             if len(clean) > 30:
                 return clean[:1500]
 
