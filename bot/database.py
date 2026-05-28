@@ -1,3 +1,4 @@
+import os
 import hashlib
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -5,7 +6,17 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, DateTime, select
 
 
-engine = create_async_engine("sqlite+aiosqlite:///news.db", echo=False)
+def _build_db_url() -> str:
+    url = os.getenv("DATABASE_URL", "")
+    # Railway даёт postgres://, SQLAlchemy требует postgresql+asyncpg://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+engine = create_async_engine(_build_db_url(), echo=False)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
