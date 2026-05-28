@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
-from .config import POST_INTERVAL_HOURS
+from .config import TIMEZONE
 from .database import init_db
-from .poster import post_one_news
+from .poster import post_one_news, post_digest, check_breaking_news
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,19 +20,39 @@ async def main():
     await init_db()
     logger.info("Database initialized.")
 
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        post_one_news,
-        trigger=IntervalTrigger(hours=POST_INTERVAL_HOURS),
-        id="post_news",
-        name="Post news",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info(f"Scheduler started. Posting every {POST_INTERVAL_HOURS} hours.")
+    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
 
-    logger.info("Posting first news immediately...")
-    await post_one_news()
+    # Утренний дайджест — 07:00 МСК
+    scheduler.add_job(
+        lambda: post_digest("morning"),
+        CronTrigger(hour=7, minute=0, timezone=TIMEZONE),
+        id="morning_digest", name="Morning digest", replace_existing=True,
+    )
+    # Обычные посты — 10:00, 13:00, 22:00 МСК
+    for hour in (10, 13, 22):
+        scheduler.add_job(
+            post_one_news,
+            CronTrigger(hour=hour, minute=0, timezone=TIMEZONE),
+            id=f"news_{hour}", name=f"News {hour}:00", replace_existing=True,
+        )
+    # Вечерний дайджест — 19:00 МСК
+    scheduler.add_job(
+        lambda: post_digest("evening"),
+        CronTrigger(hour=19, minute=0, timezone=TIMEZONE),
+        id="evening_digest", name="Evening digest", replace_existing=True,
+    )
+    # Проверка срочных новостей — каждые 30 минут
+    scheduler.add_job(
+        check_breaking_news,
+        CronTrigger(minute="*/30", timezone=TIMEZONE),
+        id="breaking_news", name="Breaking news check", replace_existing=True,
+    )
+
+    scheduler.start()
+    logger.info(
+        f"Scheduler started (TZ: {TIMEZONE}). "
+        "Schedule: digest 07:00/19:00, news 10:00/13:00/22:00, breaking every 30min."
+    )
 
     try:
         while True:

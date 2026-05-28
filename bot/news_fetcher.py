@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
 
-from .config import RSS_FEEDS
+from .config import RSS_FEEDS, FOCUS_KEYWORDS, BREAKING_KEYWORDS
 from .database import is_posted
 
 
@@ -19,8 +19,24 @@ class NewsItem:
     published: Optional[datetime] = None
     image_url: Optional[str] = None
 
+    def is_relevant(self) -> bool:
+        text = (self.title + " " + self.summary).lower()
+        return any(kw in text for kw in FOCUS_KEYWORDS)
+
+    def is_breaking(self) -> bool:
+        text = self.title.lower()
+        return any(kw in text for kw in BREAKING_KEYWORDS)
+
 
 async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
+    return await _fetch(limit_per_feed, skip_posted=True)
+
+
+async def fetch_news_for_digest(limit_per_feed: int = 10) -> list[NewsItem]:
+    return await _fetch(limit_per_feed, skip_posted=True)
+
+
+async def _fetch(limit_per_feed: int, skip_posted: bool) -> list[NewsItem]:
     items: list[NewsItem] = []
 
     async with httpx.AsyncClient(
@@ -42,13 +58,11 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
                     if not url:
                         continue
 
-                    if await is_posted(url):
+                    if skip_posted and await is_posted(url):
                         continue
 
                     title = entry.get("title", "").strip()
                     summary = _extract_summary(entry)
-
-                    image_url = None
 
                     published = None
                     if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -65,7 +79,6 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
                             source=feed_cfg["name"],
                             category=feed_cfg["category"],
                             published=published,
-                            image_url=image_url,
                         )
                     )
                     count += 1
@@ -75,8 +88,6 @@ async def fetch_all_news(limit_per_feed: int = 5) -> list[NewsItem]:
 
     items.sort(key=lambda x: x.published or datetime.min, reverse=True)
     return items
-
-
 
 
 def _extract_summary(entry) -> str:
@@ -94,23 +105,3 @@ def _extract_summary(entry) -> str:
                 return clean[:1500]
 
     return ""
-
-
-def _extract_image(entry) -> Optional[str]:
-    if hasattr(entry, "media_content") and entry.media_content:
-        for m in entry.media_content:
-            url = m.get("url", "")
-            if url and any(url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
-                return url
-
-    if hasattr(entry, "enclosures") and entry.enclosures:
-        for enc in entry.enclosures:
-            if enc.get("type", "").startswith("image/"):
-                return enc.get("href", enc.get("url", ""))
-
-    if hasattr(entry, "links"):
-        for link in entry.links:
-            if link.get("type", "").startswith("image/"):
-                return link.get("href", "")
-
-    return None
